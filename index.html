@@ -344,11 +344,87 @@ p {
         
         .flip-prev .face-front { border-radius: 3px 0 0 3px; box-shadow: inset -5px 0 20px rgba(0,0,0,0.04); }
         .flip-prev .face-back { border-radius: 0 3px 3px 0; box-shadow: inset 5px 0 20px rgba(0,0,0,0.04); transform: rotateY(-180deg); }
+/* --- ЭКРАН ЗАГРУЗКИ --- */
+#loading-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #1a252f;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #ecf0f1;
+    font-family: 'Georgia', serif;
+    transition: opacity 0.5s ease;
+}
 
+.spinner {
+    width: 50px; height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #e74c3c;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+#loading-text {
+    font-size: 18px;
+    margin-bottom: 20px;
+}
+
+#start-button {
+    display: none; /* Скрыта до полной загрузки */
+    padding: 12px 30px;
+    font-size: 18px;
+    background: #5e090f;
+    color: #fff;
+    border: 1px solid #7a0c14;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: 'Georgia', serif;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: background 0.3s ease, transform 0.1s ease;
+}
+
+#start-button:hover {
+    background: #7a0c14;
+}
+
+#start-button:active {
+    transform: scale(0.95);
+}
+
+/* --- ВСПЛЫВАЮЩАЯ ПОДСКАЗКА ДЛЯ ЗАКЛАДОК --- */
+#global-tooltip {
+    position: fixed;
+    background: rgba(26, 37, 47, 0.95);
+    color: #ecf0f1;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 10000;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    white-space: nowrap;
+    transform: translate(-50%, -100%);
+    margin-top: -15px; /* Отступ вверх от курсора */
+    font-family: 'Georgia', serif;
+}
     </style>
 </head>
 <body oncontextmenu="return false;">
+<div id="loading-overlay">
+    <div class="spinner" id="loading-spinner"></div>
+    <p id="loading-text">Книга загружается, пожалуйста подождите...</p>
+    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий</button>
+</div>
 
+<div id="global-tooltip"></div>
 <div class="book-wrapper" id="book-wrapper">
     
     <!-- ДОБАВЛЕННЫЕ ИЗОБРАЖЕНИЯ ПО БОКАМ КНИГИ -->
@@ -1073,7 +1149,21 @@ p {
     let startX = 0;
     let hasMoved = false;
     let dragPercentage = 0;
+// --- ЛОГИКА ЭКРАНА ЗАГРУЗКИ ---
+window.addEventListener('load', () => {
+    // Вызывается, когда все картинки, шрифты и скрипты загружены
+    document.getElementById('loading-spinner').style.display = 'none';
+    document.getElementById('loading-text').innerText = 'Книга успешно загружена и готова к прочтению.';
+    document.getElementById('start-button').style.display = 'inline-block';
+});
 
+function hideLoadingScreen() {
+    const overlay = document.getElementById('loading-overlay');
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+        overlay.style.display = 'none';
+    }, 500); // Ждем завершения анимации opacity
+}
 function initBookmarks() {
         const container = document.getElementById('bookmarks-container');
         container.innerHTML = '';
@@ -1105,21 +1195,42 @@ function initBookmarks() {
             }
         }
 
-        bookmarkedSpreads.forEach((bm, bIndex) => {
-            const ribbon = document.createElement('div');
-            ribbon.className = 'bookmark-ribbon';
-            ribbon.style.backgroundColor = bm.data.bookmarkColor || '#e74c3c';
-            ribbon.dataset.targetSpread = bm.spreadIndex;
-            
-            // Расчет и сохранение уникального смещения закладки относительно корешка
-            const xFromSpine = startOffset + (bIndex * step);
-            ribbon.dataset.xFromSpine = xFromSpine;
+bookmarkedSpreads.forEach((bm, bIndex) => {
+    const ribbon = document.createElement('div');
+    ribbon.className = 'bookmark-ribbon';
+    ribbon.style.backgroundColor = bm.data.bookmarkColor || '#e74c3c';
+    ribbon.dataset.targetSpread = bm.spreadIndex;
+    
+    const xFromSpine = startOffset + (bIndex * step);
+    ribbon.dataset.xFromSpine = xFromSpine;
 
-            ribbon.title = bm.data.title || (bm.data.left ? bm.data.left.title : `Разворот ${bm.spreadIndex}`);
-            ribbon.onclick = (e) => {
-                e.stopPropagation(); // Предотвращаем случайное закрытие книги при клике
-                jumpToSpread(bm.spreadIndex);
-            };
+    // Текст для подсказки
+    const tooltipText = bm.data.title || (bm.data.left ? bm.data.left.title : `Разворот ${bm.spreadIndex}`);
+    
+    // --- КАСТОМНАЯ ПОДСКАЗКА (вместо стандартного title) ---
+    ribbon.onmouseenter = (e) => {
+        const tooltip = document.getElementById('global-tooltip');
+        tooltip.innerText = tooltipText;
+        tooltip.style.opacity = '1';
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+    };
+    
+    ribbon.onmousemove = (e) => {
+        const tooltip = document.getElementById('global-tooltip');
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+    };
+    
+    ribbon.onmouseleave = () => {
+        document.getElementById('global-tooltip').style.opacity = '0';
+    };
+
+    ribbon.onclick = (e) => {
+        e.stopPropagation(); 
+        document.getElementById('global-tooltip').style.opacity = '0'; // Скрываем подсказку при клике
+        jumpToSpread(bm.spreadIndex);
+    };
             container.appendChild(ribbon);
         });
         updateBookmarks();
