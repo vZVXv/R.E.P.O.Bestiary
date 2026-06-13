@@ -415,16 +415,114 @@ p {
     margin-top: -15px; /* Отступ вверх от курсора */
     font-family: 'Georgia', serif;
 }
+/* --- ЛУПА --- */
+.magnifier {
+    position: absolute;
+    
+    /* СТАРТОВЫЕ КООРДИНАТЫ ЛУПЫ: */
+    left: 100px; /* Увеличивай значение, чтобы сдвинуть вправо (например, 150px) */
+    top: 50%;   /* Меняй значение, чтобы сдвинуть вверх/вниз (например, 20% или 80%) */
+    
+    width: 320px; 
+    height: 320px; 
+    z-index: 9999;
+    margin-top: -160px; 
+    margin-left: -160px;
+    display: none;
+    
+    /* Сквозь линзу можно кликать на книгу: */
+    pointer-events: none; 
+}
+
+.book-wrapper.is-open ~ .magnifier,
+.magnifier.is-visible {
+    display: block;
+}
+
+.magnifier-lens {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 16px solid #2c1e16; /* Рамка увеличена в 2 раза */
+    box-shadow: 
+        0 30px 50px rgba(0,0,0,0.6), 
+        inset 0 0 40px rgba(0,0,0,0.5),
+        inset 0 0 10px rgba(255,255,255,0.3);
+    background: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    pointer-events: none;
+    box-sizing: border-box;
+    backdrop-filter: blur(1px);
+}
+
+/* Блик на стекле */
+.magnifier-lens::after {
+    content: '';
+    position: absolute;
+    top: 5%; left: 10%;
+    width: 80%; height: 40%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(255,255,255,0));
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.magnifier-handle {
+    position: absolute;
+    width: 48px; /* Увеличено в 2 раза (было 24px) */
+    height: 220px; /* Увеличено в 2 раза (было 110px) */
+    background: linear-gradient(to right, #4a3627, #2c1e16, #1a110b);
+    bottom: -150px; /* Смещено пропорционально новым размерам */
+    right: -50px; /* Смещено пропорционально новым размерам */
+    transform: rotate(-45deg);
+    border-radius: 8px; /* Скругления увеличены в 2 раза */
+    box-shadow: 10px 10px 30px rgba(0,0,0,0.7);
+    border: 2px solid #110b07; /* Толщина контура увеличена в 2 раза */
+    
+    /* === ИЗМЕНЕНИЯ ДЛЯ РУЧКИ ЗДЕСЬ === */
+    pointer-events: auto; /* Включаем реакцию на мышь только для ручки */
+    cursor: grab;         /* Показываем "ладошку" при наведении */
+}
+
+/* Добавляем зажатую ладошку при перетаскивании ручки */
+.magnifier-handle:active {
+    cursor: grabbing;
+}
+
+#magnifier-zoom-content {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform-origin: 0 0;
+    pointer-events: none;
+}
+
+#magnifier-zoom-content .content-left,
+#magnifier-zoom-content .content-right {
+    width: 550px; 
+    height: 700px;
+    background: #fdfdfd; 
+    padding: 30px 40px 50px 40px;
+    box-sizing: border-box;
+}
+
     </style>
 </head>
 <body oncontextmenu="return false;">
 <div id="loading-overlay">
     <div class="spinner" id="loading-spinner"></div>
     <p id="loading-text">Книга загружается, пожалуйста подождите...</p>
-    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий (v1.0.4)</button>
+    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий (v1.0.5)</button>
 </div>
 
 <div id="global-tooltip"></div>
+<div id="magnifier" class="magnifier">
+    <div class="magnifier-lens">
+        <div id="magnifier-zoom-content"></div>
+    </div>
+    <div class="magnifier-handle"></div>
+</div>
 <div class="book-wrapper" id="book-wrapper">
     
     <!-- ДОБАВЛЕННЫЕ ИЗОБРАЖЕНИЯ ПО БОКАМ КНИГИ -->
@@ -1620,7 +1718,111 @@ function updateBookmarks() {
             }, animSpeed);
         }
     });
+// --- ПЕРЕКЛЮЧЕНИЕ ПО СТРЕЛОЧКАМ ---
+    window.addEventListener('keydown', (e) => {
+        if (!isBookOpen || isAnimating) return;
+        
+        if (e.key === 'ArrowRight') {
+            if (currentSpread <= bookData.length / 2 || currentSpread < Math.ceil(totalPhysicalPages / 2)) {
+                // Если есть куда листать вперед
+                if (currentSpread === bookData.length) closeBookToBack();
+                else jumpToSpread(currentSpread + 1);
+            }
+        } else if (e.key === 'ArrowLeft') {
+            if (currentSpread === 1) closeBook();
+            else jumpToSpread(currentSpread - 1);
+        }
+    });
 
+    // --- ЛОГИКА ЛУПЫ ---
+    const magElement = document.getElementById('magnifier');
+    const magContent = document.getElementById('magnifier-zoom-content');
+    const zoomLevel = 1.8; // Сила приближения (1.8x)
+    const lensRadius = 160; // Половина от 320px (ширины лупы)
+
+    let isDraggingMag = false;
+    let magOffsetX = 0; 
+    let magOffsetY = 0;
+
+    // Включаем лупу только когда книга открыта
+    magElement.style.display = 'block'; 
+
+    magElement.addEventListener('mousedown', (e) => {
+        isDraggingMag = true;
+        const rect = magElement.getBoundingClientRect();
+        // Запоминаем, за какую часть лупы ухватился пользователь
+        magOffsetX = e.clientX - rect.left - lensRadius;
+        magOffsetY = e.clientY - rect.top - lensRadius;
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDraggingMag = false;
+        magContent.innerHTML = ''; // Очищаем линзу при отпускании
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDraggingMag) return;
+
+        // 1. Двигаем саму лупу за курсором
+        const magX = e.clientX - magOffsetX;
+        const magY = e.clientY - magOffsetY;
+        magElement.style.left = `${magX}px`;
+        magElement.style.top = `${magY}px`;
+
+        // 2. Логика "фотографирования" текста
+        if (!isBookOpen || isAnimating) return;
+
+        // Находим центр лупы
+        const centerX = magX;
+        const centerY = magY;
+
+        // Получаем координаты левой и правой статических страниц
+        const leftPage = document.getElementById('bg-left-content');
+        const rightPage = document.getElementById('bg-right-content');
+        const leftRect = leftPage.getBoundingClientRect();
+        const rightRect = rightPage.getBoundingClientRect();
+
+        let targetRect = null;
+        let targetElement = null;
+
+        // Проверяем, находится ли центр лупы над левой страницей
+        if (centerX >= leftRect.left && centerX <= leftRect.right && 
+            centerY >= leftRect.top && centerY <= leftRect.bottom) {
+            targetRect = leftRect;
+            targetElement = leftPage;
+        } 
+        // Или над правой
+        else if (centerX >= rightRect.left && centerX <= rightRect.right && 
+                 centerY >= rightRect.top && centerY <= rightRect.bottom) {
+            targetRect = rightRect;
+            targetElement = rightPage;
+        }
+
+        if (targetElement) {
+            // Если контент в лупе не совпадает с текущей страницей - клонируем его
+            if (magContent.innerHTML === '' || !magContent.firstChild.classList.contains(targetElement.className)) {
+                magContent.innerHTML = '';
+                const clone = targetElement.cloneNode(true);
+                // Убираем id у клонов во избежание конфликтов
+                clone.removeAttribute('id'); 
+                magContent.appendChild(clone);
+            }
+
+            // Вычисляем позицию мыши относительно страницы
+            const relativeX = centerX - targetRect.left;
+            const relativeY = centerY - targetRect.top;
+
+            // Математика сдвига: мы должны сдвинуть увеличенный контент так, 
+            // чтобы точка под курсором оказалась ровно в центре линзы.
+            const translateX = lensRadius - (relativeX * zoomLevel);
+            const translateY = lensRadius - (relativeY * zoomLevel);
+
+            magContent.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoomLevel})`;
+        } else {
+            // Если лупа выведена за пределы страниц - очищаем линзу
+            magContent.innerHTML = '';
+        }
+    });
     initBookmarks();
     updateStaticContent(1);
 </script>
