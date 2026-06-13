@@ -498,13 +498,15 @@ p {
     pointer-events: none;
 }
 
+/* Было: width: 550px; height: 700px; */
+/* Стало: точные размеры оригинального текстового контейнера */
 #magnifier-zoom-content .content-left,
 #magnifier-zoom-content .content-right {
-    width: 550px; 
-    height: 700px;
+    width: 518px; 
+    height: 653px;
     background: #fdfdfd; 
-    padding: 30px 40px 50px 40px;
     box-sizing: border-box;
+    /* padding убран, чтобы он наследовался из оригинальных .content-left/.content-right */
 }
 
     </style>
@@ -513,7 +515,7 @@ p {
 <div id="loading-overlay">
     <div class="spinner" id="loading-spinner"></div>
     <p id="loading-text">Книга загружается, пожалуйста подождите...</p>
-    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий (v1.0.5)</button>
+    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий (v1.0.6)</button>
 </div>
 
 <div id="global-tooltip"></div>
