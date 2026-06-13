@@ -81,7 +81,7 @@
 
         .bookmark-ribbon {
             width: 14px; /* Оптимальная ширина для множества закладок */
-            height: 65px;
+            height: 75px;
             cursor: pointer;
             position: absolute;
             top: -45px; /* На сколько пикселей закладка торчит вверх из-за листа */
@@ -94,7 +94,7 @@
 
         .bookmark-ribbon:hover {
             height: 75px;
-            top: -55px;
+            top: -65px;
             filter: brightness(1.2);
         }
 
@@ -412,7 +412,7 @@ p {
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     white-space: nowrap;
     transform: translate(-50%, -100%);
-    margin-top: -15px; /* Отступ вверх от курсора */
+    margin-top: -40px; /* Отступ вверх от курсора */
     font-family: 'Georgia', serif;
 }
 /* --- ЛУПА --- */
@@ -506,7 +506,7 @@ p {
     height: 653px;
     background: #fdfdfd; 
     box-sizing: border-box;
-    /* padding убран, чтобы он наследовался из оригинальных .content-left/.content-right */
+   box-shadow: 0 0 0 1000px #fdfdfd;
 }
 
     </style>
@@ -515,7 +515,7 @@ p {
 <div id="loading-overlay">
     <div class="spinner" id="loading-spinner"></div>
     <p id="loading-text">Книга загружается, пожалуйста подождите...</p>
-    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий (v1.0.6)</button>
+    <button id="start-button" onclick="hideLoadingScreen()">Открыть Бестиарий (v1.0.7)</button>
 </div>
 
 <div id="global-tooltip"></div>
